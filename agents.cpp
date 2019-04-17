@@ -1,11 +1,16 @@
 #include <stdlib.h>
 #include <time.h>
-
+#include <cmath>
 #include "agents.h"
 
 
 AutoPilot::AutoPilot()
 {
+}
+
+float distanceFromAToB(Vector3 posA, Vector3 posB)
+{
+	return sqrtf((posA.x - posB.x)*(posA.x - posB.x) + (posA.y - posB.y)*(posA.y - posB.y) + (posA.z - posB.z)*(posA.z - posB.z));
 }
 
 void AutoPilot::AutoControl(MovableObject *obj)
@@ -20,7 +25,48 @@ void AutoPilot::AutoControl(MovableObject *obj)
 	// .................................................................
 	// .................................................................
 
+	Item ** foundItems;
+	long itemsCount = 0;
+	float radius = 100;
+	Item *nearestItem = nullptr;
+	float minDistance;
+
+	while (nearestItem == nullptr)
+	{
+		itemsCount = _terrain->ItemsInRadius(&foundItems, obj->state.vPos, radius *= 2);
+		minDistance = radius / 2;
+
+		for (long i = 0; i < itemsCount; i++)
+		{
+			if (foundItems[i]->type != ITEM_TREE && foundItems[i]->to_take) {
+				if (distanceFromAToB(obj->state.vPos, foundItems[i]->vPos) < minDistance)
+				{
+					minDistance = distanceFromAToB(obj->state.vPos, foundItems[i]->vPos);
+					nearestItem = foundItems[i];
+				}
+			}
+		}
+	}
+
+	Vector3 *toItem = new Vector3();
+
+	toItem->x = nearestItem->vPos.x - obj->state.vPos.x;
+	toItem->y = nearestItem->vPos.y - obj->state.vPos.y;
+	toItem->z = nearestItem->vPos.z - obj->state.vPos.z;
+
+	float tmp = (vect_local_forward ^ *toItem) / (vect_local_forward.length() *toItem->length());
+	float x = minDistance;//toItem->length();
+	float y = obj->length / 2 - obj->front_axis_dist;
+
+	float alpha = acosf(tmp);//angle_between_vectors2D(vect_local_forward, *toItem);
+	obj->state.wheel_turn_angle = - asinf((x * sinf(alpha)) / sqrtf(x*x + y * y - 2 * x*y * cosf(alpha)));
+
+	obj->F = obj->F_max;
+	
 }
+
+
+
 
 void AutoPilot::ControlTest(MovableObject *_ob, float krok_czasowy, float czas_proby)
 {

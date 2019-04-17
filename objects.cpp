@@ -2978,4 +2978,3 @@ void Terrain::DrawObject()
 	//glCallList(Floor);     
 	this->number_of_displays++;
 }
-
