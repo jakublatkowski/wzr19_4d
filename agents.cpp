@@ -39,10 +39,12 @@ void AutoPilot::AutoControl(MovableObject *obj)
 		for (long i = 0; i < itemsCount; i++)
 		{
 			if (foundItems[i]->type != ITEM_TREE && foundItems[i]->to_take) {
-				if (distanceFromAToB(obj->state.vPos, foundItems[i]->vPos) < minDistance)
-				{
-					minDistance = distanceFromAToB(obj->state.vPos, foundItems[i]->vPos);
-					nearestItem = foundItems[i];
+				if (foundItems[i]->value < 1000) {
+					if (distanceFromAToB(obj->state.vPos, foundItems[i]->vPos) < minDistance)
+					{
+						minDistance = distanceFromAToB(obj->state.vPos, foundItems[i]->vPos);
+						nearestItem = foundItems[i];
+					}
 				}
 			}
 		}
