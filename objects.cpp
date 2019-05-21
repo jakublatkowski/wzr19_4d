@@ -52,6 +52,11 @@ unsigned long __log2(unsigned long x)  // w starszej wersji Visuala (< 2013) nie
 
 MovableObject::MovableObject(Terrain *t)             // konstruktor                   
 {
+	start_selling = false;
+	start_buying = false;
+
+	last_sell_offer = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+	last_buy_offer = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
 
 	terrain = t;
 
@@ -820,8 +825,6 @@ void MovableObject::DrawObject()
 	glPrint("%d", iID);
 	glPopMatrix();
 }
-
-
 
 
 

@@ -2,6 +2,13 @@
 #include "objects.h"
 #endif
 
+#define LOW_THRESHOLD 10
+#define HIGH_THRESHOLD 30
+#define BASE_PRICE 50
+#define BASE_VOLUME 5
+#define OFFER_TIME 5000
+#define MIN_PRICE 10
+
 class AutoPilot
 {       
 private:
@@ -9,6 +16,8 @@ private:
 	//long number_of_params;
 public:
   AutoPilot();
+  bool Decide(bool buying, float my_fuel);
+  void DebugDecide(float my_fuel);
   void AutoControl(MovableObject *ob);                        // pojedynczy krok sterowania
   void ControlTest(MovableObject *_ob,float krok_czasowy, float czas_proby); 
 };

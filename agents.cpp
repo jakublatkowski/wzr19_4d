@@ -2,10 +2,94 @@
 #include <time.h>
 #include <cmath>
 #include "agents.h"
+#include <chrono>
+#include <algorithm>
+#include <windows.h>
+#include "graphics.h"
 
+extern ViewParameters par_view;
+
+using namespace std;
 
 AutoPilot::AutoPilot()
 {
+}
+
+//buying: true = decyzja dot. kupna a nie sprzeda¿y
+bool AutoPilot::Decide(bool buying, float my_fuel) {
+
+	if (buying) {
+		if (my_fuel > HIGH_THRESHOLD - 10) return false;
+		else if (my_fuel < LOW_THRESHOLD) return true;
+		else {
+			int chances = sqrt(pow(100, 2) - pow((my_fuel - 10) * 10, 2));
+			int dice_roll = rand() % 100;
+			return dice_roll < chances ? true : false;
+		}
+	}
+	else {
+		if (my_fuel < LOW_THRESHOLD + 10) return false;
+		else if (my_fuel > HIGH_THRESHOLD) return true;
+		else {
+			int chances = 100 * sqrt(pow(my_fuel - 20, 2) / pow(10, 2));
+			int dice_roll = rand() % 100;
+			return dice_roll < chances ? true : false;
+		}
+	}
+}
+
+void AutoPilot::DebugDecide(float my_fuel) {
+
+	bool b_result, s_result;
+	int b_chances, s_chances, b_dice_roll, s_dice_roll;
+
+	if (my_fuel > HIGH_THRESHOLD - 10) {
+		b_chances = 0;
+		b_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
+		b_result = false;
+	}
+	else if (my_fuel < LOW_THRESHOLD) {
+		b_chances = 100;
+		b_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
+		b_result = true;
+	}
+	else {
+		b_chances = sqrt(pow(100, 2) - pow((my_fuel - 10) * 10, 2));
+		b_dice_roll = rand() % 100;
+		b_result = b_dice_roll < b_chances ? true : false;
+	}
+
+	if (my_fuel < LOW_THRESHOLD + 10) {
+		s_chances = 0;
+		s_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
+		s_result = false;
+	}
+	else if (my_fuel > HIGH_THRESHOLD) {
+		s_chances = 100;
+		s_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
+		s_result = true;
+	}
+	else {
+		s_chances = 100 * sqrt(pow(my_fuel - 20, 2) / pow(10, 2));
+		s_dice_roll = rand() % 100;
+		s_result = s_dice_roll < s_chances ? true : false;
+	}
+	if (b_result && s_result) {
+		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=TAK,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=TAK_",
+			b_chances, b_dice_roll, s_chances, s_dice_roll);
+	}
+	else if (b_result && !s_result) {
+		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=TAK,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=NIE_",
+			b_chances, b_dice_roll, s_chances, s_dice_roll);
+	}
+	else if (!b_result && s_result) {
+		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=NIE,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=TAK_",
+			b_chances, b_dice_roll, s_chances, s_dice_roll);
+	}
+	else {
+		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=NIE,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=NIE_",
+			b_chances, b_dice_roll, s_chances, s_dice_roll);
+	}
 }
 
 float distanceFromAToB(Vector3 posA, Vector3 posB)
@@ -63,6 +147,45 @@ void AutoPilot::AutoControl(MovableObject *obj)
 
 	obj->F = obj->F_max;
 	
+	//ROZSZERZENIE
+	if (obj->state.amount_of_fuel > HIGH_THRESHOLD) {
+		obj->start_selling = true;
+		obj->start_buying = false;
+	}
+	else if (obj->state.amount_of_fuel < LOW_THRESHOLD) {
+		obj->start_selling = false;
+		obj->start_buying = true;
+	}
+	else {
+		obj->start_selling = false;
+		obj->start_buying = false;
+	}
+
+	// kupno 5 jednostek paliwa: int(50 + (10 - iloœæ paliwa) * 50), najwiêcej zap³aci 550
+	if (obj->start_buying == true &&
+		duration_cast<milliseconds>(system_clock::now().time_since_epoch() - obj->last_buy_offer) > milliseconds(OFFER_TIME))
+	{
+		int coin_offer = int(BASE_PRICE + (LOW_THRESHOLD - obj->state.amount_of_fuel) * BASE_PRICE);
+
+		sprintf(par_view.inscription1, "AGENT=%d_CHCE_KUPIC_PALIWO_ILOSC=%d_ZA_MONET=%d_", obj->iID, BASE_VOLUME, coin_offer);
+		// TODO - wys³aæ do wszystkich ofertê z odpowiednim typem (kupno) i cen¹ (coin_offer) za 5 jednostek paliwa (BASE_VOLUME)
+
+		obj->last_buy_offer = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+	}
+	// sprzeda¿ 5 jednostek paliwa: max(10, int(50 - iloœæ paliwa / 30 * 50)), nie schodzi poni¿ej 10
+	else if (obj->start_selling == true &&
+		duration_cast<milliseconds>(system_clock::now().time_since_epoch() - obj->last_sell_offer) > milliseconds(OFFER_TIME))
+	{
+		int coin_offer = max(10, int(BASE_PRICE - obj->state.amount_of_fuel / HIGH_THRESHOLD * BASE_PRICE));
+
+		sprintf(par_view.inscription1, "AGENT=%d,_CHCE_SPRZEDAC_PALIWO_ILOSC=%d_ZA_MONET=%d", obj->iID, BASE_VOLUME, coin_offer);
+		// TODO - wys³aæ do wszystkich ofertê z odpowiednim typem (kupno) i cen¹ (coin_offer) za 5 jednostek paliwa (BASE_VOLUME)
+
+		obj->last_sell_offer = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+	}
+
+	//symulacja podejmowania decyzji sprzeda¿y/kupna
+	DebugDecide(obj->state.amount_of_fuel);
 }
 
 

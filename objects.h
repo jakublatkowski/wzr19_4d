@@ -1,9 +1,13 @@
 #define _OBJECTS__H
 #include <stdio.h>
+#include <chrono>
 #include "quaternion.h"
 
 #define PI 3.1416
 extern class Terrain;
+
+
+using namespace std::chrono;
 
 struct ObjectState
 {
@@ -26,6 +30,12 @@ class MovableObject
 {
 public:
 	int iID;                  // identyfikator obiektu
+
+	bool start_selling;
+	bool start_buying;
+
+	milliseconds last_sell_offer;
+	milliseconds last_buy_offer;
 
 	ObjectState state;
 
@@ -76,7 +86,7 @@ public:
 	ObjectState State();        // metoda zwracajaca state obiektu
 	void Simulation(float dt);  // symulacja ruchu obiektu w oparciu o biezacy state, przylozone sily
 	// oraz czas dzialania sil. Efektem symulacji jest nowy state obiektu 
-	void DrawObject();			   // odrysowanie obiektu					
+	void DrawObject();			   // odrysowanie obiektu
 };
 
 enum ItemTypes { ITEM_COIN, ITEM_BARREL, ITEM_TREE, ITEM_BUILDING, ITEM_POINT, ITEM_EDGE, ITEM_START_PLACE, ITEM_WALL, ITEM_GATE };
