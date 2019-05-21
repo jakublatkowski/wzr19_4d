@@ -105,6 +105,7 @@
   <ItemGroup>
     <ClInclude Include="agents.h" />
     <ClInclude Include="graphics.h" />
+    <ClInclude Include="main.h" />
     <ClInclude Include="net.h" />
     <ClInclude Include="objects.h" />
     <ClInclude Include="quaternion.h" />

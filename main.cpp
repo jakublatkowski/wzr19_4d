@@ -12,15 +12,18 @@
 #include <gl\glu.h>
 #include <iterator> 
 #include <map>
+#include <chrono>
+
 using namespace std;
 
 #include "objects.h"
 #include "agents.h"
 #include "graphics.h"
 #include "net.h"
+#include "main.h"
 
 
-bool if_different_skills = false;          // czy zró¿nicowanie umiejêtnoœci (dla ka¿dego pojazdu losowane s¹ umiejêtnoœci
+bool if_different_skills = false;          // czy zróżnicowanie umiejętności (dla każdego pojazdu losowane są umiejętności
 // zbierania gotówki i paliwa)
 bool if_autonomous_control = false;       // sterowanie autonomiczne pojazdem
 
@@ -40,12 +43,12 @@ AutoPilot *ap;
 float fDt;                          // sredni czas pomiedzy dwoma kolejnymi cyklami symulacji i wyswietlania
 long VW_cycle_time, counter_of_simulations;     // zmienne pomocnicze potrzebne do obliczania fDt
 long start_time = clock();          // czas od poczatku dzialania aplikacji  
-long group_existing_time = clock();    // czas od pocz¹tku istnienia grupy roboczej (czas od uruchom. pierwszej aplikacji)      
+long group_existing_time = clock();    // czas od początku istnienia grupy roboczej (czas od uruchom. pierwszej aplikacji)      
 
 multicast_net *multi_reciv;         // wsk do obiektu zajmujacego sie odbiorem komunikatow
 multicast_net *multi_send;          //   -||-  wysylaniem komunikatow
 
-HANDLE threadReciv;                 // uchwyt w¹tku odbioru komunikatów
+HANDLE threadReciv;                 // uchwyt wątku odbioru komunikatów
 extern HWND main_window;
 CRITICAL_SECTION m_cs;               // do synchronizacji wątków
 
@@ -53,14 +56,14 @@ bool SHIFT_pressed = 0;
 bool CTRL_pressed = 0;
 bool ALT_pressed = 0;
 bool L_pressed = 0;
-//bool rejestracja_uczestnikow = true;   // rejestracja trwa do momentu wziêcia przedmiotu przez któregokolwiek uczestnika,
-// w przeciwnym razie trzeba by przesy³aæ ca³y state œrodowiska nowicjuszowi
+//bool rejestracja_uczestnikow = true;   // rejestracja trwa do momentu wzięcia przedmiotu przez któregokolwiek uczestnika,
+// w przeciwnym razie trzeba by przesyłać cały state środowiska nowicjuszowi
 
 // Parametry widoku:
 extern ViewParameters par_view;
 
-bool mouse_control = 0;                   // sterowanie pojazdem za pomoc¹ myszki
-int cursor_x, cursor_y;                         // polo¿enie kursora myszki w chwili w³¹czenia sterowania
+bool mouse_control = 0;                   // sterowanie pojazdem za pomocą myszki
+int cursor_x, cursor_y;                         // polożenie kursora myszki w chwili włączenia sterowania
 
 bool autopilot_presentation_mode = 0;                // czy pokazywać test autopilota
 float autopilot_presentation_current_time = 0;       // czas jaki upłynął od początku testu autopilota
@@ -69,34 +72,28 @@ float autopilot_test_time = 600;              // całkowity czas testu
 
 extern float TransferSending(int ID_receiver, int transfer_type, float transfer_value);
 
-enum frame_types {
-	OBJECT_STATE, ITEM_TAKING, ITEM_RENEWAL, COLLISION, TRANSFER
-};
-
-enum transfer_types { MONEY, FUEL};
-
 struct Frame
 {
 	int iID;
 	int frame_type;
 	ObjectState state;
 	
-	int iID_receiver;      // nr ID adresata wiadomoœci (pozostali uczestnicy powinni wiadomoœæ zignorowaæ)
+	int iID_receiver;      // nr ID adresata wiadomości (pozostali uczestnicy powinni wiadomość zignorować)
 
-	int item_number;     // nr przedmiotu, który zosta³ wziêty lub odzyskany
-	Vector3 vdV_collision;     // wektor prêdkoœci wyjœciowej po kolizji (uczestnik o wskazanym adresie powinien 
-	// przyj¹æ t¹ prêdkoœæ)  
+	int item_number;     // nr przedmiotu, który został wzięty lub odzyskany
+	Vector3 vdV_collision;     // wektor prędkości wyjściowej po kolizji (uczestnik o wskazanym adresie powinien 
+	// przyjąć tą prędkość)  
 
 	int transfer_type;        // gotówka, paliwo
-	float transfer_value;  // iloœæ gotówki lub paliwa 
+	float transfer_value;  // ilość gotówki lub paliwa 
 	int team_number;
 
-	long existing_time;        // czas jaki uplyn¹³ od uruchomienia programu
+	long existing_time;        // czas jaki uplynął od uruchomienia programu
 };
 
 
 //******************************************
-// Funkcja obs³ugi w¹tku odbioru komunikatów 
+// Funkcja obsługi wątku odbioru komunikatów 
 DWORD WINAPI ReceiveThreadFunction(void *ptr)
 {
 	multicast_net *pmt_net = (multicast_net*)ptr;  // wskaŸnik do obiektu klasy multicast_net
@@ -106,20 +103,20 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 	
 	while (1)
 	{
-		size = pmt_net->reciv((char*)&frame, sizeof(Frame));   // oczekiwanie na nadejœcie ramki 
+		size = pmt_net->reciv((char*)&frame, sizeof(Frame));   // oczekiwanie na nadejście ramki 
 		// Lock the Critical section
 		EnterCriticalSection(&m_cs);               // wejście na ścieżkę krytyczną - by inne wątki (np. główny) nie współdzielił 
 
 		switch (frame.frame_type)
 		{
-		case OBJECT_STATE:           // podstawowy typ ramki informuj¹cej o stanie obiektu              
+		case OBJECT_STATE:           // podstawowy typ ramki informującej o stanie obiektu              
 		{
 			state = frame.state;
 			//fprintf(f,"odebrano state iID = %d, ID dla mojego obiektu = %d\n",state.iID,my_vehicle->iID);
-			if ((frame.iID != my_vehicle->iID))          // jeœli to nie mój w³asny Object
+			if ((frame.iID != my_vehicle->iID))          // jeśli to nie mój własny Object
 			{
 
-				if ((network_vehicles.size() == 0) || (network_vehicles[frame.iID] == NULL))         // nie ma jeszcze takiego obiektu w tablicy -> trzeba go stworzyæ
+				if ((network_vehicles.size() == 0) || (network_vehicles[frame.iID] == NULL))         // nie ma jeszcze takiego obiektu w tablicy -> trzeba go stworzyć
 				{
 					MovableObject *ob = new MovableObject(&terrain);
 					ob->iID = frame.iID;
@@ -127,7 +124,7 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 					if (frame.existing_time > group_existing_time) group_existing_time = frame.existing_time;
 					ob->ChangeState(state);   // aktualizacja stanu obiektu obcego 
 					terrain.InsertObjectIntoSectors(ob);
-					// wys³anie nowemu uczestnikowi informacji o wszystkich wziêtych przedmiotach:
+					// wysłanie nowemu uczestnikowi informacji o wszystkich wziętych przedmiotach:
 					for (long i = 0; i < terrain.number_of_items; i++)
 						if ((terrain.p[i].to_take == 0) && (terrain.p[i].if_taken_by_me))
 						{
@@ -150,7 +147,7 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			}
 			break;
 		}
-		case ITEM_TAKING:            // frame informuj¹ca, ¿e ktoœ wzi¹³ przedmiot o podanym numerze
+		case ITEM_TAKING:            // frame informująca, że ktoś wziął przedmiot o podanym numerze
 		{
 			state = frame.state;
 			if ((frame.item_number < terrain.number_of_items) && (frame.iID != my_vehicle->iID))
@@ -160,31 +157,133 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			}
 			break;
 		}
-		case ITEM_RENEWAL:       // frame informujaca, ¿e przedmiot wczeœniej wziêty pojawi³ siê znowu w tym samym miejscu
+		case ITEM_RENEWAL:       // frame informujaca, że przedmiot wcześniej wzięty pojawił się znowu w tym samym miejscu
 		{
 			if (frame.item_number < terrain.number_of_items)
 				terrain.p[frame.item_number].to_take = 1;
 			break;
 		}
-		case COLLISION:                       // frame informuj¹ca o tym, ¿e Object uleg³ kolizji
+		case COLLISION:                       // frame informująca o tym, że Object uległ kolizji
 		{
-			if (frame.iID_receiver == my_vehicle->iID)  // ID pojazdu, który uczestniczy³ w kolizji zgadza siê z moim ID 
+			if (frame.iID_receiver == my_vehicle->iID)  // ID pojazdu, który uczestniczył w kolizji zgadza się z moim ID 
 			{
-				my_vehicle->vdV_collision = frame.vdV_collision; // przepisuje poprawkê w³asnej prêdkoœci
-				my_vehicle->iID_collider = my_vehicle->iID; // ustawiam nr. kolidujacego jako w³asny na znak, ¿e powinienem poprawiæ prêdkoœæ
+				my_vehicle->vdV_collision = frame.vdV_collision; // przepisuje poprawkę własnej prędkości
+				my_vehicle->iID_collider = my_vehicle->iID; // ustawiam nr. kolidujacego jako własny na znak, że powinienem poprawić prędkość
 			}
 			break;
 		}
-		case TRANSFER:                       // frame informuj¹ca o przelewie pieniê¿nym lub przekazaniu towaru    
+		case TRANSFER:                       // frame informująca o przelewie pieniężnym lub przekazaniu towaru    
 		{
-			if (frame.iID_receiver == my_vehicle->iID)  // ID pojazdu, ktory otrzymal przelew zgadza siê z moim ID 
+			if (frame.iID_receiver == my_vehicle->iID)  // ID pojazdu, ktory otrzymal przelew zgadza się z moim ID 
 			{
 				if (frame.transfer_type == MONEY)
 					my_vehicle->state.money += frame.transfer_value;
 				else if (frame.transfer_type == FUEL)
 					my_vehicle->state.amount_of_fuel += frame.transfer_value;
 
-				// nale¿a³oby jeszcze przelew potwierdziæ (w UDP ramki mog¹ byæ gubione!)
+				// należałoby jeszcze przelew potwierdzić (w UDP ramki mogą być gubione!)
+			}
+			break;
+		}
+
+		case BUY_OFFER:
+		{
+			if (if_autonomous_control && frame.iID != my_vehicle->iID)  // nie będę samemu sobie sprzedawał
+			{
+				if (AutoPilot::Decide(false, my_vehicle->state.amount_of_fuel)) {
+					Frame reply_frame;
+					reply_frame.frame_type = BUY_ACCEPT;
+					reply_frame.transfer_value = frame.transfer_value;
+					reply_frame.iID = my_vehicle->iID;
+					reply_frame.iID_receiver = frame.iID;
+					int iRozmiar = multi_send->send((char*)& reply_frame, sizeof(Frame));
+					sprintf(par_view.inscription1, "Nasz_agent_zgadza_sie_sprzedac_%d_jednostek_paliwa_za_%d_monet_", BASE_VOLUME, int(frame.transfer_value));
+				}
+			}
+			break;
+		}
+
+		case SELL_OFFER:
+		{
+			if (if_autonomous_control && frame.iID != my_vehicle->iID)  // nie będę samemu sobie sprzedawał
+			{
+				if (AutoPilot::Decide(true, my_vehicle->state.amount_of_fuel)) {
+					Frame reply_frame;
+					reply_frame.frame_type = SELL_ACCEPT;
+					reply_frame.transfer_value = frame.transfer_value;
+					reply_frame.iID = my_vehicle->iID;
+					reply_frame.iID_receiver = frame.iID;
+					int iRozmiar = multi_send->send((char*)& reply_frame, sizeof(Frame));
+					sprintf(par_view.inscription1, "Nasz_agent_zgadza_sie_kupic_%d_jednostek_paliwa_za_%d_monet_", BASE_VOLUME, int(frame.transfer_value));
+				}
+			}
+			break;
+		}
+
+		case BUY_ACCEPT:
+		{
+			if (frame.iID_receiver == my_vehicle->iID && my_vehicle->start_buying &&
+				my_vehicle->state.money >= frame.transfer_value)
+			{
+				Frame reply_frame;
+				reply_frame.frame_type = BUY_PART;
+				my_vehicle->state.money -= frame.transfer_value;
+				reply_frame.transfer_value = frame.transfer_value;
+				reply_frame.iID = my_vehicle->iID;
+				reply_frame.iID_receiver = frame.iID;
+				int iRozmiar = multi_send->send((char*)& reply_frame, sizeof(Frame));
+				sprintf(par_view.inscription1, "Nasz_agent_wyslal_%d_monet_i_czeka_na_%d_jednostek_paliwa_", int(frame.transfer_value), BASE_VOLUME);
+			}
+			break;
+		}
+
+		case SELL_ACCEPT:
+		{
+			if (frame.iID_receiver == my_vehicle->iID && my_vehicle->start_selling &&
+				my_vehicle->state.amount_of_fuel >= BASE_VOLUME)
+			{
+				Frame reply_frame;
+				reply_frame.frame_type = SELL_PART;
+				my_vehicle->state.amount_of_fuel -= BASE_VOLUME;
+				reply_frame.transfer_value = frame.transfer_value;
+				reply_frame.iID = my_vehicle->iID;
+				reply_frame.iID_receiver = frame.iID;
+				int iRozmiar = multi_send->send((char*)& reply_frame, sizeof(Frame));
+				sprintf(par_view.inscription1, "Nasz_agent_wyslal_%d_jednostek_paliwa_i_czeka_na_%d_monet_", BASE_VOLUME, int(frame.transfer_value));
+			}
+			break;
+		}
+
+		case BUY_PART:
+		{
+			if (frame.iID_receiver == my_vehicle->iID) {
+				my_vehicle->state.money += frame.transfer_value;
+				Frame reply_frame;
+				reply_frame.frame_type = TRANSFER;
+				reply_frame.transfer_type = FUEL;
+				my_vehicle->state.amount_of_fuel -= BASE_VOLUME;
+				reply_frame.transfer_value = BASE_VOLUME;
+				reply_frame.iID = my_vehicle->iID;
+				reply_frame.iID_receiver = frame.iID;
+				int iRozmiar = multi_send->send((char*)& reply_frame, sizeof(Frame));
+				sprintf(par_view.inscription1, "Nasz_agent_otrzymal_%d_monet_i_wyslal_%d_jednostek_paliwa_", int(frame.transfer_value), BASE_VOLUME);
+			}
+			break;
+		}
+
+		case SELL_PART:
+		{
+			if (frame.iID_receiver == my_vehicle->iID) {
+				my_vehicle->state.amount_of_fuel += BASE_VOLUME;
+				Frame reply_frame;
+				reply_frame.frame_type = TRANSFER;
+				reply_frame.transfer_type = MONEY;
+				my_vehicle->state.money -= frame.transfer_value;
+				reply_frame.transfer_value = frame.transfer_value;
+				reply_frame.iID = my_vehicle->iID;
+				reply_frame.iID_receiver = frame.iID;
+				int iRozmiar = multi_send->send((char*)& reply_frame, sizeof(Frame));
+				sprintf(par_view.inscription1, "Nasz_agent_otrzymal_%d_jednostek_paliwa_i_wyslal_%d_monet_", int(frame.transfer_value), BASE_VOLUME);
 			}
 			break;
 		}
@@ -197,8 +296,8 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 }
 
 // *****************************************************************
-// ****    Wszystko co trzeba zrobiæ podczas uruchamiania aplikacji
-// ****    poza grafik¹   
+// ****    Wszystko co trzeba zrobić podczas uruchamiania aplikacji
+// ****    poza grafiką   
 void InteractionInitialisation()
 {
 	DWORD dwThreadId;
@@ -213,7 +312,7 @@ void InteractionInitialisation()
 
 	// obiekty sieciowe typu multicast (z podaniem adresu WZR oraz numeru portu)
 	multi_reciv = new multicast_net("224.10.12.100", 10001);      // Object do odbioru ramek sieciowych
-	multi_send = new multicast_net("224.10.12.100", 10001);       // Object do wysy³ania ramek
+	multi_send = new multicast_net("224.10.12.100", 10001);       // Object do wysyłania ramek
 
 	// uruchomienie watku obslugujacego odbior komunikatow
 	threadReciv = CreateThread(
@@ -228,15 +327,15 @@ void InteractionInitialisation()
 
 
 // *****************************************************************
-// ****    Wszystko co trzeba zrobiæ w ka¿dym cyklu dzia³ania 
-// ****    aplikacji poza grafik¹ 
+// ****    Wszystko co trzeba zrobić w każdym cyklu działania 
+// ****    aplikacji poza grafiką 
 void VirtualWorldCycle()
 {
 	counter_of_simulations++;
 
-	// obliczenie œredniego czasu pomiêdzy dwoma kolejnnymi symulacjami po to, by zachowaæ  fizycznych 
-	if (counter_of_simulations % 50 == 0)          // jeœli licznik cykli przekroczy³ pewn¹ wartoœæ, to
-	{                                   // nale¿y na nowo obliczyæ œredni czas cyklu fDt
+	// obliczenie średniego czasu pomiędzy dwoma kolejnnymi symulacjami po to, by zachować  fizycznych 
+	if (counter_of_simulations % 50 == 0)          // jeśli licznik cykli przekroczył pewną wartość, to
+	{                                   // należy na nowo obliczyć średni czas cyklu fDt
 		char text[200];
 		long prev_time = VW_cycle_time;
 		VW_cycle_time = clock();
@@ -266,13 +365,13 @@ void VirtualWorldCycle()
 	else
 	{
 		terrain.DeleteObjectsFromSectors(my_vehicle);
-		my_vehicle->Simulation(fDt);                    // symulacja w³asnego obiektu
+		my_vehicle->Simulation(fDt);                    // symulacja własnego obiektu
 		terrain.InsertObjectIntoSectors(my_vehicle);
 	}
 
 
-	if ((my_vehicle->iID_collider > -1) &&             // wykryto kolizjê - wysy³am specjaln¹ ramkê, by poinformowaæ o tym drugiego uczestnika
-		(my_vehicle->iID_collider != my_vehicle->iID)) // oczywiœcie wtedy, gdy nie chodzi o mój pojazd
+	if ((my_vehicle->iID_collider > -1) &&             // wykryto kolizję - wysyłam specjalną ramkę, by poinformować o tym drugiego uczestnika
+		(my_vehicle->iID_collider != my_vehicle->iID)) // oczywiście wtedy, gdy nie chodzi o mój pojazd
 	{
 		Frame frame;
 		frame.frame_type = COLLISION;
@@ -292,14 +391,14 @@ void VirtualWorldCycle()
 
 	Frame frame;
 	frame.frame_type = OBJECT_STATE;
-	frame.state = my_vehicle->State();         // state w³asnego obiektu 
+	frame.state = my_vehicle->State();         // state własnego obiektu 
 	frame.iID = my_vehicle->iID;
 	frame.existing_time = clock() - start_time;
 	int iRozmiar = multi_send->send((char*)&frame, sizeof(Frame));
 
 
 
-	// wziêcie przedmiotu -> wysy³anie ramki 
+	// wzięcie przedmiotu -> wysyłanie ramki 
 	if (my_vehicle->number_of_taking_item > -1)
 	{
 		Frame frame;
@@ -315,9 +414,9 @@ void VirtualWorldCycle()
 		my_vehicle->taking_value = 0;
 	}
 
-	// odnawianie siê przedmiotu -> wysy³anie ramki
+	// odnawianie się przedmiotu -> wysyłanie ramki
 	if (my_vehicle->number_of_renewed_item > -1)
-	{                             // jeœli min¹³ pewnien okres czasu przedmiot mo¿e zostaæ przywrócony
+	{                             // jeśli minął pewnien okres czasu przedmiot może zostać przywrócony
 		Frame frame;
 		frame.frame_type = ITEM_RENEWAL;
 		frame.item_number = my_vehicle->number_of_renewed_item;
@@ -328,12 +427,36 @@ void VirtualWorldCycle()
 		my_vehicle->number_of_renewed_item = -1;
 	}
 
-
+	// ROZSZERZENIE
+	// czy staram się kupić paliwo i minęło przynajmniej 5 sekund od ostatniej oferty
+	if (if_autonomous_control && my_vehicle->start_buying == true &&
+		duration_cast<milliseconds>(system_clock::now().time_since_epoch() - my_vehicle->last_buy_offer) > milliseconds(OFFER_TIME))
+	{
+		Frame frame;
+		frame.frame_type = BUY_OFFER;
+		frame.transfer_value = AutoPilot::OfferPrice(true, my_vehicle);
+		frame.iID = my_vehicle->iID;
+		my_vehicle->last_buy_offer = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+		sprintf(par_view.inscription1, "Wyslanie_oferty_kupna_%d_jednostek_paliwa_za_%d_monet_", BASE_VOLUME, frame.transfer_value);
+		int iRozmiar = multi_send->send((char*)& frame, sizeof(Frame));
+	}
+	//analogicznie dla sprzedaży
+	else if (if_autonomous_control && my_vehicle->start_selling == true &&
+		duration_cast<milliseconds>(system_clock::now().time_since_epoch() - my_vehicle->last_sell_offer) > milliseconds(OFFER_TIME))
+	{
+		Frame frame;
+		frame.frame_type = SELL_OFFER;
+		frame.transfer_value = AutoPilot::OfferPrice(false, my_vehicle);
+		frame.iID = my_vehicle->iID;
+		my_vehicle->last_sell_offer = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+		sprintf(par_view.inscription1, "Wyslanie_oferty_sprzedazy_%d_jednostek_paliwa_za_%d_monet_", BASE_VOLUME, frame.transfer_value);
+		int iRozmiar = multi_send->send((char*)& frame, sizeof(Frame));
+	}
 
 	// --------------------------------------------------------------------
 	// --------------- MIEJSCE NA ALGORYTM STEROWANIA ---------------------
-	// (dobór si³y F w granicach (-F_max/2, F_max), k¹ta skrêtu kó³ wheel_turn_angle (-alpha_max, alpha_max) oraz
-	// si³y o hamowania breaking_degree (0,1) [+ decyzji w zwi¹zku ze wspó³prac¹] w zale¿noœci od sytuacji)
+	// (dobór siły F w granicach (-F_max/2, F_max), kąta skrętu kół wheel_turn_angle (-alpha_max, alpha_max) oraz
+	// siły o hamowania breaking_degree (0,1) [+ decyzji w związku ze współpracą] w zależności od sytuacji)
 	if (if_autonomous_control)
 	{
 		ap->AutoControl(my_vehicle);
@@ -344,15 +467,15 @@ void VirtualWorldCycle()
 }
 
 // *****************************************************************
-// ****    Wszystko co trzeba zrobiæ podczas zamykania aplikacji
-// ****    poza grafik¹ 
+// ****    Wszystko co trzeba zrobić podczas zamykania aplikacji
+// ****    poza grafiką 
 void EndOfInteraction()
 {
 	fprintf(f, "Koniec interakcji\n");
 	fclose(f);
 }
 
-// Funkcja wysylajaca ramke z przekazem, zwraca zrealizowan¹ wartoœæ przekazu
+// Funkcja wysylajaca ramke z przekazem, zwraca zrealizowaną wartość przekazu
 float TransferSending(int ID_receiver, int transfer_type, float transfer_value)
 {
 	Frame frame;
@@ -362,7 +485,7 @@ float TransferSending(int ID_receiver, int transfer_type, float transfer_value)
 	frame.transfer_value = transfer_value;
 	frame.iID = my_vehicle->iID;
 
-	// tutaj nale¿a³oby uzyskaæ potwierdzenie przekazu zanim sumy zostan¹ odjête
+	// tutaj należałoby uzyskać potwierdzenie przekazu zanim sumy zostaną odjęte
 	if (transfer_type == MONEY)
 	{
 		if (my_vehicle->state.money < transfer_value)
@@ -466,7 +589,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 }
 
 // ************************************************************************
-// ****    Obs³uga klawiszy s³u¿¹cych do sterowania obiektami lub
+// ****    Obsługa klawiszy służących do sterowania obiektami lub
 // ****    widokami 
 void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 {
@@ -485,7 +608,7 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 		int x = LOWORD(lParam);
 		int y = HIWORD(lParam);
 		if (mouse_control)
-			my_vehicle->F = my_vehicle->F_max;        // si³a pchaj¹ca do przodu
+			my_vehicle->F = my_vehicle->F_max;        // siła pchająca do przodu
 
 		break;
 	}
@@ -497,7 +620,7 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 		int RSHIFT = GetKeyState(VK_RSHIFT);
 
 		if (mouse_control)
-			my_vehicle->F = -my_vehicle->F_max / 2;        // si³a pchaj¹ca do tylu
+			my_vehicle->F = -my_vehicle->F_max / 2;        // siła pchająca do tylu
 		else if (wParam & MK_SHIFT)                    // odznaczanie wszystkich obiektów   
 		{
 			for (long i = 0; i < terrain.number_of_selected_items; i++)
@@ -579,7 +702,7 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 					terrain.SelectUnselectItemOrGroup(index_min);
 				}
 				//char lan[256];
-				//sprintf(lan, "klikniêto w przedmiot %d pol = (%f, %f, %f)\n",ind_min,terrain.p[ind_min].vPos.x,terrain.p[ind_min].vPos.y,terrain.p[ind_min].vPos.z);
+				//sprintf(lan, "kliknięto w przedmiot %d pol = (%f, %f, %f)\n",ind_min,terrain.p[ind_min].vPos.x,terrain.p[ind_min].vPos.y,terrain.p[ind_min].vPos.z);
 				//SetWindowText(main_window,lan);
 			}
 			Vector3 point_click = Cursor3dCoordinates(x, r.bottom - r.top - y);
@@ -588,7 +711,7 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 
 		break;
 	}
-	case WM_MBUTTONDOWN: //reakcja na œrodkowy przycisk myszki : uaktywnienie/dezaktywacja sterwania myszkowego
+	case WM_MBUTTONDOWN: //reakcja na środkowy przycisk myszki : uaktywnienie/dezaktywacja sterwania myszkowego
 	{
 		mouse_control = 1 - mouse_control;
 		cursor_x = LOWORD(lParam);
@@ -598,13 +721,13 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONUP: //reakcja na puszczenie lewego przycisku myszki
 	{
 		if (mouse_control)
-			my_vehicle->F = 0.0;        // si³a pchaj¹ca do przodu
+			my_vehicle->F = 0.0;        // siła pchająca do przodu
 		break;
 	}
 	case WM_RBUTTONUP: //reakcja na puszczenie lewy przycisk myszki
 	{
 		if (mouse_control)
-			my_vehicle->F = 0.0;        // si³a pchaj¹ca do przodu
+			my_vehicle->F = 0.0;        // siła pchająca do przodu
 		break;
 	}
 	case WM_MOUSEMOVE:
@@ -620,10 +743,10 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	}
-	case WM_MOUSEWHEEL:     // ruch kó³kiem myszy -> przybli¿anie, oddalanie widoku
+	case WM_MOUSEWHEEL:     // ruch kółkiem myszy -> przybliżanie, oddalanie widoku
 	{
-		int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);  // dodatni do przodu, ujemny do ty³u
-		//fprintf(f,"zDelta = %d\n",zDelta);          // zwykle +-120, jak siê bardzo szybko zakrêci to czasmi wyjdzie +-240
+		int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);  // dodatni do przodu, ujemny do tyłu
+		//fprintf(f,"zDelta = %d\n",zDelta);          // zwykle +-120, jak się bardzo szybko zakręci to czasmi wyjdzie +-240
 		if (zDelta > 0){
 			if (par_view.distance > 0.5) par_view.distance /= 1.2;
 			else par_view.distance = 0;
@@ -658,15 +781,15 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 
 		case VK_SPACE:
 		{
-			my_vehicle->breaking_degree = 1.0;       // stopieñ hamowania (reszta zale¿y od si³y docisku i wsp. tarcia)
-			break;                       // 1.0 to maksymalny stopieñ (np. zablokowanie kó³)
+			my_vehicle->breaking_degree = 1.0;       // stopieñ hamowania (reszta zależy od siły docisku i wsp. tarcia)
+			break;                       // 1.0 to maksymalny stopieñ (np. zablokowanie kół)
 		}
 		case VK_UP:
 		{
 			if (CTRL_pressed && par_view.top_view)
 				par_view.shift_to_bottom += par_view.distance / 2;       // przesunięcie widoku z kamery w górę
 			else
-				my_vehicle->F = my_vehicle->F_max;        // si³a pchaj¹ca do przodu
+				my_vehicle->F = my_vehicle->F_max;        // siła pchająca do przodu
 			break;
 		}
 		case VK_DOWN:
@@ -719,7 +842,7 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 
 			break;
 		}
-		case 'W':   // przybli¿enie widoku
+		case 'W':   // przybliżenie widoku
 		{
 			//initial_camera_position = initial_camera_position - initial_camera_direction*0.3;
 			if (par_view.distance > 0.5)par_view.distance /= 1.2;
@@ -742,22 +865,22 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 				SetWindowText(main_window, "Wyłączono widok z góry.");
 			break;
 		}
-		case 'E':   // obrót kamery ku górze (wzglêdem lokalnej osi z)
+		case 'E':   // obrót kamery ku górze (względem lokalnej osi z)
 		{
 			par_view.cam_angle_z += PI * 5 / 180;
 			break;
 		}
-		case 'D':   // obrót kamery ku do³owi (wzglêdem lokalnej osi z)
+		case 'D':   // obrót kamery ku dołowi (względem lokalnej osi z)
 		{
 			par_view.cam_angle_z -= PI * 5 / 180;
 			break;
 		}
-		case 'A':   // w³¹czanie, wy³¹czanie trybu œledzenia obiektu
+		case 'A':   // włączanie, wyłączanie trybu śledzenia obiektu
 		{
 			par_view.tracking = 1 - par_view.tracking;
 			break;
 		}
-		case 'Z':   // zoom - zmniejszenie k¹ta widzenia
+		case 'Z':   // zoom - zmniejszenie kąta widzenia
 		{
 			par_view.zoom /= 1.1;
 			RECT rc;
@@ -765,7 +888,7 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 			WindowSizeChange(rc.right - rc.left, rc.bottom - rc.top);
 			break;
 		}
-		case 'X':   // zoom - zwiêkszenie k¹ta widzenia
+		case 'X':   // zoom - zwiększenie kąta widzenia
 		{
 			par_view.zoom *= 1.1;
 			RECT rc;
@@ -818,7 +941,7 @@ void MessagesHandling(UINT message_type, WPARAM wParam, LPARAM lParam)
 		case VK_F10:  // sumulacja automatycznego sterowania obiektem w celu jego oceny poza czasem rzeczywistym 
 		{
 			//float czas_proby = 600;               // czas testu w sekundach
-			bool if_parameters_optimal = true;    // pe³ne umiejêtnoœci, sta³y czas kroku
+			bool if_parameters_optimal = true;    // pełne umiejętności, stały czas kroku
 			Terrain t2;
 			MovableObject *Object = new MovableObject(&t2);
 			//AutoPilot *a = new AutoPilot(&t2,Object);

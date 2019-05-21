@@ -16,8 +16,9 @@ private:
 	//long number_of_params;
 public:
   AutoPilot();
-  bool Decide(bool buying, float my_fuel);
-  void DebugDecide(float my_fuel);
+  static bool Decide(bool buying, float my_fuel);
+  //void DebugDecide(float my_fuel);
+  static int OfferPrice(bool buy_offer, MovableObject *obj);
   void AutoControl(MovableObject *ob);                        // pojedynczy krok sterowania
   void ControlTest(MovableObject *_ob,float krok_czasowy, float czas_proby); 
 };

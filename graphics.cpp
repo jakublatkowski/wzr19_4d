@@ -38,13 +38,13 @@ extern void DrawGlobalCoordinateSystem();
 void StandardViewParametersSetting(ViewParameters *p)
 {
 	p->initial_camera_direction = Vector3(0, -3, -11);   // direction patrzenia
-	p->initial_camera_position = Vector3(31, 3, 0);          // po³o¿enie kamery
+	p->initial_camera_position = Vector3(31, 3, 0);          // położenie kamery
 	p->initial_camera_vertical = Vector3(0, 1, 0);           // direction pionu kamery             
 
 	// Zmienne - ustawiane przez użytkownika
-	p->tracking = 1;                             // tryb œledzenia obiektu przez kamerê
+	p->tracking = 1;                             // tryb śledzenia obiektu przez kamerę
 	p->top_view = 0;                          // tryb widoku z gory
-	p->distance = 10.0;                          // distance lub przybli¿enie kamery
+	p->distance = 10.0;                          // distance lub przybliżenie kamery
 	p->zoom = 1.0;                               // zmiana kąta widzenia
 	p->cam_angle_z = 0;                            // obrót kamery góra-dół
 
