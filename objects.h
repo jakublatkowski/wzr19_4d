@@ -31,11 +31,18 @@ class MovableObject
 public:
 	int iID;                  // identyfikator obiektu
 
+	//ROZSZERZENIE
+	// flagi pozwalaj¹ce agentowi publikowaæ oferty
 	bool start_selling;
 	bool start_buying;
 
+	// czas w ms, kiedy agent ostatnio publikowa³ oferty
+	// s³u¿y temu, by nie publikowaæ co ka¿dy obieg pêtli, tylko co ~5 sekund
 	milliseconds last_sell_offer;
 	milliseconds last_buy_offer;
+
+
+
 
 	ObjectState state;
 

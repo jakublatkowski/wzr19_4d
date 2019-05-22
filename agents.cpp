@@ -18,7 +18,9 @@ AutoPilot::AutoPilot()
 {
 }
 
-//buying: true = decyzja dot. kupna a nie sprzeda¿y
+// ROZSZERZENIE
+// metoda do podejmowania decyzji przyjêcia/odrzucenia oferty
+// buying = true => decyzja dot. kupna, a nie sprzeda¿y
 bool AutoPilot::Decide(bool buying, float my_fuel) {
 
 	if (buying) {
@@ -41,60 +43,9 @@ bool AutoPilot::Decide(bool buying, float my_fuel) {
 	}
 }
 
-/*void AutoPilot::DebugDecide(float my_fuel) {
-
-	bool b_result, s_result;
-	int b_chances, s_chances, b_dice_roll, s_dice_roll;
-
-	if (my_fuel > HIGH_THRESHOLD - 10) {
-		b_chances = 0;
-		b_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
-		b_result = false;
-	}
-	else if (my_fuel < LOW_THRESHOLD) {
-		b_chances = 100;
-		b_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
-		b_result = true;
-	}
-	else {
-		b_chances = sqrt(pow(100, 2) - pow((my_fuel - 10) * 10, 2));
-		b_dice_roll = rand() % 100;
-		b_result = b_dice_roll < b_chances ? true : false;
-	}
-
-	if (my_fuel < LOW_THRESHOLD + 10) {
-		s_chances = 0;
-		s_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
-		s_result = false;
-	}
-	else if (my_fuel > HIGH_THRESHOLD) {
-		s_chances = 100;
-		s_dice_roll = -1;			// specjalnie, by zasygnalizowaæ ¿e nie rzucaliœmy kostk¹
-		s_result = true;
-	}
-	else {
-		s_chances = 100 * sqrt(pow(my_fuel - 20, 2) / pow(10, 2));
-		s_dice_roll = rand() % 100;
-		s_result = s_dice_roll < s_chances ? true : false;
-	}
-	if (b_result && s_result) {
-		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=TAK,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=TAK_",
-			b_chances, b_dice_roll, s_chances, s_dice_roll);
-	}
-	else if (b_result && !s_result) {
-		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=TAK,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=NIE_",
-			b_chances, b_dice_roll, s_chances, s_dice_roll);
-	}
-	else if (!b_result && s_result) {
-		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=NIE,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=TAK_",
-			b_chances, b_dice_roll, s_chances, s_dice_roll);
-	}
-	else {
-		sprintf(par_view.inscription1, "SZANSE_KUPNA=%d\%,_RZUT=%d,_DECYZJA=NIE,_SZANSE_SPRZEDA¯Y=%d\%,_RZUT=%d,_DECYZJA=NIE_",
-			b_chances, b_dice_roll, s_chances, s_dice_roll);
-	}
-}*/
-
+// metoda do obliczania ceny kupna/sprzeda¿y przy publikowaniu oferty
+// nim mam wiêcej paliwa, tym taniej sprzedam
+// nim mam mniej paliwa, tym za wiêcej kupiê
 int AutoPilot::OfferPrice(bool buy_offer, MovableObject *obj) {
 	
 	int price;
@@ -108,6 +59,8 @@ int AutoPilot::OfferPrice(bool buy_offer, MovableObject *obj) {
 	}
 	return price;
 }
+
+
 
 float distanceFromAToB(Vector3 posA, Vector3 posB)
 {
@@ -165,6 +118,7 @@ void AutoPilot::AutoControl(MovableObject *obj)
 	obj->F = obj->F_max;
 	
 	//ROZSZERZENIE
+	// ustawianie flag w zale¿noœci od obecnej iloœci paliwa i ustawionych górnych/dolnych progów
 	if (obj->state.amount_of_fuel > HIGH_THRESHOLD) {
 		obj->start_selling = true;
 		obj->start_buying = false;
@@ -177,10 +131,6 @@ void AutoPilot::AutoControl(MovableObject *obj)
 		obj->start_selling = false;
 		obj->start_buying = false;
 	}
-
-
-	//symulacja podejmowania decyzji sprzeda¿y/kupna
-	//DebugDecide(obj->state.amount_of_fuel);
 }
 
 

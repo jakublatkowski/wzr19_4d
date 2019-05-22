@@ -186,6 +186,8 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			break;
 		}
 
+		// ROZSZERZENIE
+		// jak agent zobaczy ofertę od kogoś, podejmuje decyzję co zrobić - przyjąć czy odrzucić ofertę
 		case BUY_OFFER:
 		{
 			if (if_autonomous_control && frame.iID != my_vehicle->iID)  // nie będę samemu sobie sprzedawał
@@ -202,7 +204,8 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			}
 			break;
 		}
-
+		
+		// jak wyżej, ale dla ofert sprzedaży
 		case SELL_OFFER:
 		{
 			if (if_autonomous_control && frame.iID != my_vehicle->iID)  // nie będę samemu sobie sprzedawał
@@ -220,6 +223,8 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			break;
 		}
 
+		// jak autor oferty widzi od kogoś zainteresowanie, to 
+		// sprawdza czy oferta nadal aktualna i jak tak, to wysyła swoją część transakcji
 		case BUY_ACCEPT:
 		{
 			if (frame.iID_receiver == my_vehicle->iID && my_vehicle->start_buying &&
@@ -237,6 +242,7 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			break;
 		}
 
+		// jak wyżej, dla oferty sprzedaży
 		case SELL_ACCEPT:
 		{
 			if (frame.iID_receiver == my_vehicle->iID && my_vehicle->start_selling &&
@@ -254,6 +260,7 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			break;
 		}
 
+		// osoba która zgodziła się na handel otrzymuje swoją część i wysyła w ramce TRANSFER należność do autora oferty
 		case BUY_PART:
 		{
 			if (frame.iID_receiver == my_vehicle->iID) {
@@ -271,6 +278,7 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			break;
 		}
 
+		// jak wyżej, dla oferty sprzedaży
 		case SELL_PART:
 		{
 			if (frame.iID_receiver == my_vehicle->iID) {
@@ -288,6 +296,9 @@ DWORD WINAPI ReceiveThreadFunction(void *ptr)
 			break;
 		}
 		
+
+
+
 		} // switch po typach ramek
 		// Opuszczenie ścieżki krytycznej / Release the Critical section
 		LeaveCriticalSection(&m_cs);               // wyjście ze ścieżki krytycznej
@@ -428,7 +439,7 @@ void VirtualWorldCycle()
 	}
 
 	// ROZSZERZENIE
-	// czy staram się kupić paliwo i minęło przynajmniej 5 sekund od ostatniej oferty
+	// czy staram się kupić paliwo i minęło przynajmniej 5 sekund od ostatniej oferty - by nie spamować wiecznie ofert
 	if (if_autonomous_control && my_vehicle->start_buying == true &&
 		duration_cast<milliseconds>(system_clock::now().time_since_epoch() - my_vehicle->last_buy_offer) > milliseconds(OFFER_TIME))
 	{
@@ -437,7 +448,7 @@ void VirtualWorldCycle()
 		frame.transfer_value = AutoPilot::OfferPrice(true, my_vehicle);
 		frame.iID = my_vehicle->iID;
 		my_vehicle->last_buy_offer = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
-		sprintf(par_view.inscription1, "Wyslanie_oferty_kupna_%d_jednostek_paliwa_za_%d_monet_", BASE_VOLUME, frame.transfer_value);
+		sprintf(par_view.inscription1, "Wyslanie_oferty_kupna_%d_jednostek_paliwa_za_%d_monet_", BASE_VOLUME, int(frame.transfer_value));
 		int iRozmiar = multi_send->send((char*)& frame, sizeof(Frame));
 	}
 	//analogicznie dla sprzedaży
@@ -452,6 +463,9 @@ void VirtualWorldCycle()
 		sprintf(par_view.inscription1, "Wyslanie_oferty_sprzedazy_%d_jednostek_paliwa_za_%d_monet_", BASE_VOLUME, frame.transfer_value);
 		int iRozmiar = multi_send->send((char*)& frame, sizeof(Frame));
 	}
+
+
+
 
 	// --------------------------------------------------------------------
 	// --------------- MIEJSCE NA ALGORYTM STEROWANIA ---------------------
